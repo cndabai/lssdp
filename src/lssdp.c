@@ -6,12 +6,13 @@
 #include <errno.h>      // errno
 #include <unistd.h>     // close
 #include <sys/time.h>   // gettimeofday
-#include <sys/ioctl.h>  // ioctl, FIONBIO
-#include <net/if.h>     // struct ifconf, struct ifreq
+#include <dfs_posix.h>  // ioctl, FIONBIO
+#include <sys/select.h>
 #include <fcntl.h>      // fcntl, F_GETFD, F_SETFD, FD_CLOEXEC
 #include <sys/socket.h> // struct sockaddr, AF_INET, SOL_SOCKET, socklen_t, setsockopt, socket, bind, sendto, recvfrom
 #include <netinet/in.h> // struct sockaddr_in, struct ip_mreq, INADDR_ANY, IPPROTO_IP, also include <sys/socket.h>
 #include <arpa/inet.h>  // inet_aton, inet_ntop, inet_addr, also include <netinet/in.h>
+#include <netdev.h>
 #include "lssdp.h"
 
 #ifndef _SIZEOF_ADDR_IFREQ
@@ -19,12 +20,11 @@
 #endif
 
 /** Definition **/
-#define LSSDP_BUFFER_LEN    2048
+#define LSSDP_BUFFER_LEN    512
 #define lssdp_debug(fmt, agrs...) lssdp_log(LSSDP_LOG_DEBUG, __LINE__, __func__, fmt, ##agrs)
 #define lssdp_info(fmt, agrs...)  lssdp_log(LSSDP_LOG_INFO,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_warn(fmt, agrs...)  lssdp_log(LSSDP_LOG_WARN,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_error(fmt, agrs...) lssdp_log(LSSDP_LOG_ERROR, __LINE__, __func__, fmt, ##agrs)
-
 
 /** Struct: lssdp_packet **/
 typedef struct lssdp_packet {
@@ -39,7 +39,6 @@ typedef struct lssdp_packet {
     long long       update_time;
 } lssdp_packet;
 
-
 /** Internal Function **/
 static int send_multicast_data(const char * data, const struct lssdp_interface interface, unsigned short ssdp_port);
 static int lssdp_send_response(lssdp_ctx * lssdp, struct sockaddr_in address);
@@ -47,13 +46,12 @@ static int lssdp_packet_parser(const char * data, size_t data_len, lssdp_packet 
 static int parse_field_line(const char * data, size_t start, size_t end, lssdp_packet * packet);
 static int get_colon_index(const char * string, size_t start, size_t end);
 static int trim_spaces(const char * string, size_t * start, size_t * end);
-static long long get_current_time();
+static long long get_current_time(void);
 static int lssdp_log(int level, int line, const char * func, const char * format, ...);
 static int neighbor_list_add(lssdp_ctx * lssdp, const lssdp_packet packet);
 static int lssdp_neighbor_remove_all(lssdp_ctx * lssdp);
 static void neighbor_list_free(lssdp_nbr * list);
 static struct lssdp_interface * find_interface_in_LAN(lssdp_ctx * lssdp, uint32_t address);
-
 
 /** Global Variable **/
 static struct {
@@ -89,29 +87,24 @@ static struct {
     .log_callback = NULL
 };
 
-
 // 01. lssdp_network_interface_update
 int lssdp_network_interface_update(lssdp_ctx * lssdp) {
+    
+    int result = -1;
+    const size_t SIZE_OF_INTERFACE_LIST = sizeof(struct lssdp_interface) * LSSDP_INTERFACE_LIST_SIZE;
+
     if (lssdp == NULL) {
         lssdp_error("lssdp should not be NULL\n");
         return -1;
     }
 
-    const size_t SIZE_OF_INTERFACE_LIST = sizeof(struct lssdp_interface) * LSSDP_INTERFACE_LIST_SIZE;
-
     // 1. copy orginal interface
-    struct lssdp_interface original_interface[LSSDP_INTERFACE_LIST_SIZE] = {};
+    struct lssdp_interface original_interface[LSSDP_INTERFACE_LIST_SIZE];
     memcpy(original_interface, lssdp->interface, SIZE_OF_INTERFACE_LIST);
 
     // 2. reset lssdp->interface
     lssdp->interface_num = 0;
     memset(lssdp->interface, 0, SIZE_OF_INTERFACE_LIST);
-
-    int result = -1;
-
-    /* Reference to this article:
-     * http://stackoverflow.com/a/8007079
-     */
 
     // 3. create UDP socket
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -121,64 +114,33 @@ int lssdp_network_interface_update(lssdp_ctx * lssdp) {
     }
 
     // 4. get ifconfig
-    char buffer[LSSDP_BUFFER_LEN] = {};
-    struct ifconf ifc = {
-        .ifc_len = sizeof(buffer),
-        .ifc_buf = (caddr_t) buffer
-    };
-
-    if (ioctl(fd, SIOCGIFCONF, &ifc) < 0) {
-        lssdp_error("ioctl SIOCGIFCONF failed, errno = %s (%d)\n", strerror(errno), errno);
-        goto end;
-    }
-
-    // 5. setup lssdp->interface
-    size_t i;
-    struct ifreq * ifr;
-    for (i = 0; i < ifc.ifc_len; i += _SIZEOF_ADDR_IFREQ(*ifr)) {
-        ifr = (struct ifreq *)(buffer + i);
-        if (ifr->ifr_addr.sa_family != AF_INET) {
-            // only support IPv4
-            continue;
+    extern struct netdev *netdev_default;
+    if(netdev_default != NULL)
+    {
+        while(!netdev_is_link_up(netdev_default))
+        {
+            rt_thread_mdelay(2000);
         }
 
-        // 5-1. get interface ip string
-        char ip[LSSDP_IP_LEN] = {};
-        struct sockaddr_in * addr = (struct sockaddr_in *) &ifr->ifr_addr;
-        if (inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip)) == NULL) {
+         // get interface ip string
+        if (inet_ntoa(netdev_default->ip_addr) == NULL) {
             lssdp_error("inet_ntop failed, errno = %s (%d)\n", strerror(errno), errno);
-            continue;
+            return -1;
         }
 
-        // 5-2. get network mask
-        struct ifreq netmask = {};
-        strcpy(netmask.ifr_name, ifr->ifr_name);
-        if (ioctl(fd, SIOCGIFNETMASK, &netmask) != 0) {
-            lssdp_error("ioctl SIOCGIFNETMASK failed, errno = %s (%d)\n", strerror(errno), errno);
-            continue;
-        }
-
-        // 5-3. check network interface number
-        if (lssdp->interface_num >= LSSDP_INTERFACE_LIST_SIZE) {
-            lssdp_warn("interface number is over than MAX SIZE (%d)     %s %s\n", LSSDP_INTERFACE_LIST_SIZE, ifr->ifr_name, ip);
-            continue;
-        }
-
-        // 5-4. set interface
-        size_t n = lssdp->interface_num;
-        snprintf(lssdp->interface[n].name, LSSDP_INTERFACE_NAME_LEN, "%s", ifr->ifr_name); // name
-        snprintf(lssdp->interface[n].ip,   LSSDP_IP_LEN,             "%s", ip);            // ip string
-        lssdp->interface[n].addr = addr->sin_addr.s_addr;                                  // address in network byte order
+        // set interface
+        snprintf(lssdp->interface[lssdp->interface_num].name, LSSDP_INTERFACE_NAME_LEN, "%s", netdev_default->name);                // device name
+        snprintf(lssdp->interface[lssdp->interface_num].ip,   LSSDP_IP_LEN,             "%s", inet_ntoa(netdev_default->ip_addr));  // ip string
+        lssdp->interface[lssdp->interface_num].addr = (uint32_t)netdev_default->ip_addr.addr;                                       // address in network byte order
 
         // set network mask
-        addr = (struct sockaddr_in *) &netmask.ifr_addr;
-        lssdp->interface[n].netmask = addr->sin_addr.s_addr;                               // mask in network byte order
+        lssdp->interface[lssdp->interface_num].netmask = (uint32_t)netdev_default->netmask.addr;  
+        // mask in network byte order
+        lssdp->interface_num = 1;
 
-        // increase interface number
-        lssdp->interface_num++;
+        result = 0;
     }
 
-    result = 0;
 end:
     // close socket
     if (fd >= 0 && close(fd) != 0) {
@@ -211,6 +173,20 @@ int lssdp_socket_create(lssdp_ctx * lssdp) {
         return -1;
     }
 
+    int result = -1;
+    int opt = 1;
+
+    struct sockaddr_in addr = {
+        .sin_family      = AF_INET,
+        .sin_port        = htons(lssdp->port),
+        .sin_addr.s_addr = htonl(INADDR_ANY)
+    };
+
+    struct ip_mreq imr = {
+        .imr_multiaddr.s_addr = inet_addr(Global.ADDR_MULTICAST),
+        .imr_interface.s_addr = htonl(INADDR_ANY)
+    };
+
     if (lssdp->port == 0) {
         lssdp_error("SSDP port (%d) has not been setup.\n", lssdp->port);
         return -1;
@@ -226,10 +202,8 @@ int lssdp_socket_create(lssdp_ctx * lssdp) {
         return -1;
     }
 
-    int result = -1;
-
     // set non-blocking
-    int opt = 1;
+
     if (ioctl(lssdp->sock, FIONBIO, &opt) != 0) {
         lssdp_error("ioctl FIONBIO failed, errno = %s (%d)\n", strerror(errno), errno);
         goto end;
@@ -241,33 +215,13 @@ int lssdp_socket_create(lssdp_ctx * lssdp) {
         goto end;
     }
 
-    // set FD_CLOEXEC (http://kaivy2001.pixnet.net/blog/post/32726732)
-    int sock_opt = fcntl(lssdp->sock, F_GETFD);
-    if (sock_opt == -1) {
-        lssdp_error("fcntl F_GETFD failed, errno = %s (%d)\n", strerror(errno), errno);
-    } else {
-        // F_SETFD
-        if (fcntl(lssdp->sock, F_SETFD, sock_opt | FD_CLOEXEC) == -1) {
-            lssdp_error("fcntl F_SETFD FD_CLOEXEC failed, errno = %s (%d)\n", strerror(errno), errno);
-        }
-    }
-
     // bind socket
-    struct sockaddr_in addr = {
-        .sin_family      = AF_INET,
-        .sin_port        = htons(lssdp->port),
-        .sin_addr.s_addr = htonl(INADDR_ANY)
-    };
     if (bind(lssdp->sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
         lssdp_error("bind failed, errno = %s (%d)\n", strerror(errno), errno);
         goto end;
     }
 
     // set IP_ADD_MEMBERSHIP
-    struct ip_mreq imr = {
-        .imr_multiaddr.s_addr = inet_addr(Global.ADDR_MULTICAST),
-        .imr_interface.s_addr = htonl(INADDR_ANY)
-    };
     if (setsockopt(lssdp->sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imr, sizeof(struct ip_mreq)) != 0) {
         lssdp_error("setsockopt IP_ADD_MEMBERSHIP failed: %s (%d)\n", strerror(errno), errno);
         goto end;
@@ -327,12 +281,14 @@ int lssdp_socket_read(lssdp_ctx * lssdp) {
         return -1;
     }
 
-    char buffer[LSSDP_BUFFER_LEN] = {};
-    struct sockaddr_in address = {};
+    char buffer[LSSDP_BUFFER_LEN] = {0};
+    struct sockaddr_in address;
     socklen_t address_len = sizeof(struct sockaddr_in);
+    lssdp_packet packet = {0};
 
     ssize_t recv_len = recvfrom(lssdp->sock, buffer, sizeof(buffer), 0, (struct sockaddr *)&address, &address_len);
     if (recv_len == -1) {
+        rt_thread_mdelay(2000);
         lssdp_error("recvfrom fd %d failed, errno = %s (%d)\n", lssdp->sock, strerror(errno), errno);
         return -1;
     }
@@ -346,7 +302,6 @@ int lssdp_socket_read(lssdp_ctx * lssdp) {
     }
 
     // parse SSDP packet to struct
-    lssdp_packet packet = {};
     if (lssdp_packet_parser(buffer, recv_len, &packet) != 0) {
         goto end;
     }
@@ -401,7 +356,7 @@ int lssdp_send_msearch(lssdp_ctx * lssdp) {
     }
 
     // 1. set M-SEARCH packet
-    char msearch[LSSDP_BUFFER_LEN] = {};
+    char msearch[LSSDP_BUFFER_LEN];
     snprintf(msearch, sizeof(msearch),
         "%s"
         "HOST:%s:%d\r\n"
@@ -463,7 +418,7 @@ int lssdp_send_notify(lssdp_ctx * lssdp) {
         }
 
         // set notify packet
-        char notify[LSSDP_BUFFER_LEN] = {};
+        char notify[LSSDP_BUFFER_LEN];
         char * domain = lssdp->header.location.domain;
         snprintf(notify, sizeof(notify),
             "%s"
@@ -562,6 +517,20 @@ void lssdp_set_log_callback(void (* callback)(const char * file, const char * ta
 /** Internal Function **/
 
 static int send_multicast_data(const char * data, const struct lssdp_interface interface, unsigned short ssdp_port) {
+    
+    int result = -1;
+    char opt = 0;
+
+    struct sockaddr_in addr = {
+        .sin_family      = AF_INET,
+        .sin_addr.s_addr = interface.addr
+    };
+
+    struct sockaddr_in dest_addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(ssdp_port)
+    };
+    
     if (data == NULL) {
         lssdp_error("data should not be NULL\n");
         return -1;
@@ -578,7 +547,6 @@ static int send_multicast_data(const char * data, const struct lssdp_interface i
         return -1;
     }
 
-    int result = -1;
 
     // 1. create UDP socket
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -588,27 +556,18 @@ static int send_multicast_data(const char * data, const struct lssdp_interface i
     }
 
     // 2. bind socket
-    struct sockaddr_in addr = {
-        .sin_family      = AF_INET,
-        .sin_addr.s_addr = interface.addr
-    };
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         lssdp_error("bind failed, errno = %s (%d)\n", strerror(errno), errno);
         goto end;
     }
 
     // 3. disable IP_MULTICAST_LOOP
-    char opt = 0;
     if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, &opt, sizeof(opt)) < 0) {
         lssdp_error("setsockopt IP_MULTICAST_LOOP failed, errno = %s (%d)\n", strerror(errno), errno);
         goto end;
     }
 
     // 4. set destination address
-    struct sockaddr_in dest_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(ssdp_port)
-    };
     if (inet_aton(Global.ADDR_MULTICAST, &dest_addr.sin_addr) == 0) {
         lssdp_error("inet_aton failed, errno = %s (%d)\n", strerror(errno), errno);
         goto end;
@@ -629,9 +588,10 @@ end:
 }
 
 static int lssdp_send_response(lssdp_ctx * lssdp, struct sockaddr_in address) {
-    // get M-SEARCH IP
-    char msearch_ip[LSSDP_IP_LEN] = {};
-    if (inet_ntop(AF_INET, &address.sin_addr, msearch_ip, sizeof(msearch_ip)) == NULL) {
+
+    char *msearch_ip = inet_ntoa(address.sin_addr);
+    
+    if (msearch_ip == NULL) {
         lssdp_error("inet_ntop failed, errno = %s (%d)\n", strerror(errno), errno);
         return -1;
     }
@@ -650,7 +610,7 @@ static int lssdp_send_response(lssdp_ctx * lssdp, struct sockaddr_in address) {
     }
 
     // 2. set response packet
-    char response[LSSDP_BUFFER_LEN] = {};
+    char response[LSSDP_BUFFER_LEN];
     char * domain = lssdp->header.location.domain;
     int response_len = snprintf(response, sizeof(response),
         "%s"
@@ -701,7 +661,7 @@ static int lssdp_packet_parser(const char * data, size_t data_len, lssdp_packet 
     }
 
     if (data_len != strlen(data)) {
-        lssdp_error("data_len (%zu) is not match to the data length (%zu)\n", data_len, strlen(data));
+        lssdp_error("data_len (%u) is not match to the data length (%u)\n", data_len, strlen(data));
         return -1;
     }
 
@@ -846,7 +806,7 @@ static int trim_spaces(const char * string, size_t * start, size_t * end) {
 }
 
 static long long get_current_time() {
-    struct timeval time = {};
+    struct timeval time;
     if (gettimeofday(&time, NULL) == -1) {
         lssdp_error("gettimeofday failed, errno = %s (%d)\n", strerror(errno), errno);
         return -1;
@@ -859,7 +819,7 @@ static int lssdp_log(int level, int line, const char * func, const char * format
         return -1;
     }
 
-    char message[LSSDP_BUFFER_LEN] = {};
+    char message[LSSDP_BUFFER_LEN];
 
     // create message by va_list
     va_list args;
@@ -910,7 +870,6 @@ static int neighbor_list_add(lssdp_ctx * lssdp, const lssdp_packet packet) {
         nbr->update_time = packet.update_time;
         goto end;
     }
-
 
     /* location is not found in SSDP list: add to list */
 

@@ -1,144 +1,67 @@
-# lssdp
-light weight SSDP library
+# LSSDP
 
-### What is SSDP
+## 1. 介绍 
 
-The Simple Service Discovery Protocol (SSDP) is a network protocol based on the Internet Protocol Suite for advertisement and discovery of network services and presence information.
+LSSDP (Lightweight Simple Sever Discovery Protocol)，简单服务发现协议是一种应用层协议，此协议为网络客户提供一种无需任何配置、管理和维护网络设备服务的机制，此协议采用基于通知和发现路由的多播发现方式实现。
 
-====
+通过使用该软件包，可以让连接到局域网中的 RT-Thread 设备被客户端自动发现，并使用 RT-Thread 设备所提供的服务。例如 adb 软件包提供的文件传输服务。
 
-### Support Platform
+### 1.1 许可证
 
-* Linux Ubuntu
-* MAC OSX
-* Android
-* iOS
+The MIT License (MIT)
 
-====
+## 2. 获取软件包
 
-### How To Build and Test
+在使用的 BSP 目录下，使用 ENV 工具打开 menuconfig 来获取软件包。
 
-```
-make clean
-make
+- 配置软件包并使能示例
 
-cd test
-./daemon.exe
+```c
+RT-Thread online packages --->
+     IoT - internet of things  --->
+         Lssdp: SSDP protocol implemented on rt-thread
+             [*]   Enable LSSDP add/del samples
+                   Version (latest)  --->
 ```
 
-====
+- 使用 `pkgs --update` 命令下载软件包
 
-#### lssdp_ctx:
+## 3. 使用 LSSDP
 
-lssdp context
+### 3.1 打开软件包示例
 
-**port** - SSDP UDP port, 1900 port is general.
+配置软件包时打开 lssdp 软件包的添加 `[*]   Enable LSSDP add/del samples` 选项，重新编译下载运行。
 
-**sock** - SSDP socket, created by `lssdp_socket_create`, and close by `lssdp_socket_close`
+lssdp_add_example 命令会注册一个名为 `urn:rt-thread:service:ssdp` 的服务到 ssdp 中：
 
-**neighbor_list** - neighbor list, when received *NOTIFY* or *RESPONSE* packet, neighbor list will be updated.
+![1557565323474](docs/figures/1557565323474.png)
 
-**neighbor_timeout** - this value will be used by `lssdp_neighbor_check_timeout`. If neighbor is timeout, then remove from neighbor list.
+从示例代码中可以看到注册的设备信息：
 
-**debug** - SSDP debug mode, show debug message.
+![1557571840845](docs/figures/1557571840845.png)
 
-**interface** - Network Interface list. Call `lssdp_network_interface_update` to update the list.
+## 3.2 运行桌面端测试程序
 
-**interface_num** - the number of Network Interface list.
+通过 tools 目录下的测试程序，可以看到在局域网中提供 `urn:rt-thread:service:ssdp` 服务的设备，如下图所示：
 
-**header.search_target** - SSDP Search Target (ST). A potential search target.
+![1557571616388](docs/figures/1557571616388.png)
 
-**header.unique_service_name** - SSDP Unique Service Name (USN). A composite identifier for the advertisement.
+从上图可以看到从 RT-Thread 设备收到了提供  `urn:rt-thread:service:ssdp` 服务的设备信息。从 LOCATION 属性可以得知提供该服务的设备地址和端口号。
 
-**header.location = prefix + domain + suffix** - [http://] + IP + [:PORT/URI]
+## 3.3 添加 lssdp 服务
 
-**header.sm_id** - Optional field.
+可以参考 lssdp_sample 中的示例代码，使用如下 API 在 lssdp 中添加或者删除服务。
 
-**header.device_type** - Optional field.
+| API 接口                                        | 功能                |
+| ----------------------------------------------- | ------------------- |
+| int lssdp_service_add(struct lssdp_service *h); | 添加服务到 lssdp    |
+| int lssdp_service_del(struct lssdp_service *h); | 从 lssdp 中删除服务 |
 
-**network_interface_changed_callback** - when interface is changed, this callback would be invoked.
+## 4、参考资料
 
-**neighbor_list_changed_callback** - when neighbor list is changed, this callback would be invoked.
+- 无
 
-**packet_received_callback** - when received any SSDP packet, this callback would be invoked. It callback is usally used for debugging.
+## 5、 联系方式 & 感谢
 
-====
-
-#### Function API (8)
-
-##### 01. lssdp_network_interface_update
-
-update network interface.
-
-```
-- lssdp.interface, lssdp.interface_num will be updated.
-```
-
-
-##### 02. lssdp_socket_create
-
-create SSDP socket.
-
-```
-- SSDP port must be setup ready before call this function. (lssdp.port > 0)
-
-- if SSDP socket is already exist (lssdp.sock > 0), the socket will be closed, and create a new one.
-
-- SSDP neighbor list will be force clean up.
-```
-
-##### 03. lssdp_socket_close
-
-close SSDP socket.
-
-```
-- if SSDP socket <= 0, will be ignore, and lssdp.sock will be set -1.
-- SSDP neighbor list will be force clean up.
-```
-
-##### 04. lssdp_socket_read
-
-read SSDP socket.
-
-```
-1. if read success, packet_received_callback will be invoked.
-
-2. if received SSDP packet is match to Search Target (lssdp.header.search_target),
-   - M-SEARCH: send RESPONSE back
-   - NOTIFY/RESPONSE: add/update to SSDP neighbor list
-```
-
-```
-- SSDP socket and port must be setup ready before call this function. (sock, port > 0)
-- if SSDP neighbor list has been changed, neighbor_list_changed_callback will be invoked.
-```
-
-##### 05. lssdp_send_msearch
-
-send SSDP M-SEARCH packet to multicast address (239.255.255.250)
-
-```
-- SSDP port must be setup ready before call this function. (lssdp.port > 0)
-```
-
-##### 06. lssdp_send_notify
-
-send SSDP NOTIFY packet to multicast address (239.255.255.250)
-
-```
-- SSDP port must be setup ready before call this function. (lssdp.port > 0)
-```
-
-##### 07. lssdp_neighbor_check_timeout
-
-check neighbor in list is timeout or not. (lssdp.neighbor_timeout)
-
-the timeout neighbor will be remove from the list.
-
-```
-- if neighbor be removed, neighbor_list_changed_callback will be invoked.
-```
-
-##### 08. lssdp_set_log_callback
-
-setup SSDP log callback. All SSDP library log will be forward to here.
+- 维护： RT-Thread 开发团队
+- 主页： https://github.com/RT-Thread-packages/lssdp
