@@ -14,10 +14,8 @@
 #include <netdev.h>
 #include "lssdp_service.h"
 
-#define DBG_ENABLE
 #define DBG_SECTION_NAME  "lssdp service"
 #define DBG_LEVEL         DBG_INFO
-#define DBG_COLOR
 #include <rtdbg.h>
 
 static rt_list_t _lssdp_list = RT_LIST_OBJECT_INIT(_lssdp_list);

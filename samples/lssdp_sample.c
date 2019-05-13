@@ -12,10 +12,8 @@
 #include <string.h>
 #include "lssdp_service.h"
 
-#define DBG_ENABLE
 #define DBG_SECTION_NAME  "lssdp example"
 #define DBG_LEVEL         DBG_INFO
-#define DBG_COLOR
 #include <rtdbg.h>
 
 // lssdp service add example
