@@ -28,6 +28,9 @@ static int lssdp_service_register(struct lssdp_service *h)
     if (h == RT_NULL)
         return -RT_ERROR;
 
+    /* enter interrupt */
+    rt_interrupt_enter();
+
     rt_slist_for_each(head, &_lssdp_list)
     {
         if (rt_strcmp(h->name, ((lssdp_service_t)head)->name) == 0)
@@ -40,6 +43,9 @@ static int lssdp_service_register(struct lssdp_service *h)
     rt_slist_init(&h->list);
     rt_slist_append(&_lssdp_list, &h->list);
 
+    /* leave interrupt */
+    rt_interrupt_leave();
+
     return RT_EOK;
 }
 
@@ -51,6 +57,9 @@ static int lssdp_service_unregister(struct lssdp_service *h)
     if (h == RT_NULL)
         return -RT_ERROR;
 
+    /* enter interrupt */
+    rt_interrupt_enter();
+
     rt_slist_for_each(head, &_lssdp_list)
     {
         if (rt_strcmp(h->name, ((lssdp_service_t)head)->name) == 0)
@@ -60,6 +69,9 @@ static int lssdp_service_unregister(struct lssdp_service *h)
             return RT_EOK;
         }
     }
+
+    /* leave interrupt */
+    rt_interrupt_leave();
 
     LOG_E("Can't find service name %s to unregister", h->name);
 
