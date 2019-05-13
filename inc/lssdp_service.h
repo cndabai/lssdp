@@ -32,7 +32,7 @@ struct lssdp_device
 
 struct lssdp_service
 {
-    rt_list_t list;
+    rt_slist_t list;
 
     char name[LSSDP_FIELD_LEN];
 

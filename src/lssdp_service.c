@@ -18,14 +18,14 @@
 #define DBG_LEVEL         DBG_INFO
 #include <rtdbg.h>
 
-static rt_list_t _lssdp_list = RT_LIST_OBJECT_INIT(_lssdp_list);
+static rt_slist_t _lssdp_list = RT_SLIST_OBJECT_INIT(_lssdp_list);
 
 // register a service to lssdp daemon
 static int lssdp_service_register(struct lssdp_service *h)
 {
-    struct rt_list_node *head;
+    struct rt_slist_node *head;
 
-    rt_list_for_each(head, &_lssdp_list)
+    rt_slist_for_each(head, &_lssdp_list)
     {
         if (rt_strcmp(h->name, ((lssdp_service_t)head)->name) == 0)
         {
@@ -34,8 +34,8 @@ static int lssdp_service_register(struct lssdp_service *h)
         }
     }
 
-    rt_list_init(&h->list);
-    rt_list_insert_after(head, &h->list);
+    rt_slist_init(&h->list);
+    rt_slist_append(&_lssdp_list, &h->list);
 
     return RT_EOK;
 }
@@ -43,13 +43,13 @@ static int lssdp_service_register(struct lssdp_service *h)
 // unregister a service to lssdp daemon
 static int lssdp_service_unregister(struct lssdp_service *h)
 {
-    struct rt_list_node *head;
+    struct rt_slist_node *head;
 
-    rt_list_for_each(head, &_lssdp_list)
+    rt_slist_for_each(head, &_lssdp_list)
     {
         if (rt_strcmp(h->name, ((lssdp_service_t)head)->name) == 0)
         {
-            rt_list_remove(head);
+            rt_slist_remove(&_lssdp_list, head);
             rt_free(head);
             return RT_EOK;
         }
@@ -111,15 +111,15 @@ int lssdp_service_del(struct lssdp_service *h)
 // get the number of lssdp services
 int lssdp_service_count(void)
 {
-    return rt_list_len((const rt_list_t*)(&_lssdp_list));
+    return rt_slist_len((const rt_slist_t*)(&_lssdp_list));
 }
 
 // send notify messages to network
 int lssdp_service_send_notify(lssdp_ctx * lssdp)
 {
-    struct rt_list_node *head;
+    struct rt_slist_node *head;
 
-    rt_list_for_each(head, &_lssdp_list)
+    rt_slist_for_each(head, &_lssdp_list)
     {
         LOG_D("name: %s ", ((struct lssdp_service *)head)->name);
 
