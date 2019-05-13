@@ -25,6 +25,9 @@ static int lssdp_service_register(struct lssdp_service *h)
 {
     struct rt_slist_node *head;
 
+    if (h == RT_NULL)
+        return -RT_ERROR;
+
     rt_slist_for_each(head, &_lssdp_list)
     {
         if (rt_strcmp(h->name, ((lssdp_service_t)head)->name) == 0)
@@ -44,6 +47,9 @@ static int lssdp_service_register(struct lssdp_service *h)
 static int lssdp_service_unregister(struct lssdp_service *h)
 {
     struct rt_slist_node *head;
+
+    if (h == RT_NULL)
+        return -RT_ERROR;
 
     rt_slist_for_each(head, &_lssdp_list)
     {
@@ -65,6 +71,9 @@ int lssdp_service_add(struct lssdp_service *h)
 {
     struct lssdp_service *ser;
 
+    if (h == RT_NULL)
+        return -RT_ERROR;
+
     ser = (struct lssdp_service*) rt_malloc (sizeof(struct lssdp_service));
     if (ser == NULL)
     {
@@ -84,7 +93,7 @@ int lssdp_service_add(struct lssdp_service *h)
     memcpy(ser->info.sm_id,                h->info.sm_id,                LSSDP_FIELD_LEN);
     memcpy(ser->info.device_type,          h->info.device_type,          LSSDP_FIELD_LEN);
     memcpy(ser->info.suffix,               h->info.suffix,               LSSDP_FIELD_LEN);
-    
+
     // if register failed
     if(lssdp_service_register(ser) != 0)
     {
@@ -98,6 +107,9 @@ int lssdp_service_add(struct lssdp_service *h)
 // del a service from lssdp
 int lssdp_service_del(struct lssdp_service *h)
 {
+    if (h == RT_NULL)
+        return -RT_ERROR;
+
     if(lssdp_service_unregister(h) == 0)
     {
         return RT_EOK;
@@ -118,6 +130,9 @@ int lssdp_service_count(void)
 int lssdp_service_send_notify(lssdp_ctx * lssdp)
 {
     struct rt_slist_node *head;
+
+    if (!lssdp)
+        return -RT_ERROR;
 
     rt_slist_for_each(head, &_lssdp_list)
     {
