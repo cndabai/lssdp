@@ -144,7 +144,7 @@ int lssdp_service_send_notify(lssdp_ctx * lssdp)
 #define THREAD_STACK_SIZE       4096
 #define THREAD_TIMESLICE        5
 
-int lssdp_start()
+int lssdp_start(void)
 {
     rt_thread_t tid1 = RT_NULL;
     extern int lssdp_daemon();

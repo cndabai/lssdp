@@ -83,7 +83,7 @@ int show_interface_list_and_rebind_socket(lssdp_ctx * lssdp) {
     return 0;
 }
 
-int lssdp_daemon() {
+int lssdp_daemon(void) {
     lssdp_set_log_callback(log_callback);
 
     lssdp_ctx lssdp = {
