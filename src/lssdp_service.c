@@ -149,7 +149,7 @@ int lssdp_start(void)
     rt_thread_t tid1 = RT_NULL;
     extern int lssdp_daemon();
     tid1 = rt_thread_create("lssdp",
-                            (void (*)(void *))lssdp_daemon, (void*)1,
+                            (void (*)(void *))lssdp_daemon, RT_NULL,
                             THREAD_STACK_SIZE, THREAD_PRIORITY, THREAD_TIMESLICE);
     if (tid1 != RT_NULL)
         rt_thread_startup(tid1);
