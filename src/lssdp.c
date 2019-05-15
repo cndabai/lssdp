@@ -105,18 +105,18 @@ int lssdp_network_interface_update(lssdp_ctx * lssdp) {
     // 2. reset lssdp->interface
     lssdp->interface_num = 0;
     memset(lssdp->interface, 0, SIZE_OF_INTERFACE_LIST);
-
-    // 3. create UDP socket
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) {
-        lssdp_error("create socket failed, errno = %s (%d)\n", strerror(errno), errno);
-        goto end;
+    
+    // 3. get ifconfig
+    extern struct netdev *netdev_default;
+    while(netdev_default == NULL)
+    {
+        rt_thread_mdelay(5000);
+        lssdp_error("Can't find default net device, please check the network driver.\r\n");
     }
 
-    // 4. get ifconfig
-    extern struct netdev *netdev_default;
     if(netdev_default != NULL)
     {
+        // check if network is linkup
         while(!netdev_is_link_up(netdev_default))
         {
             rt_thread_mdelay(2000);
@@ -139,6 +139,13 @@ int lssdp_network_interface_update(lssdp_ctx * lssdp) {
         lssdp->interface_num = 1;
 
         result = 0;
+    }
+    
+    // 4. create UDP socket
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        lssdp_error("create socket failed, errno = %s (%d)\n", strerror(errno), errno);
+        goto end;
     }
 
 end:
