@@ -110,7 +110,7 @@ int lssdp_network_interface_update(lssdp_ctx * lssdp) {
     extern struct netdev *netdev_default;
     while(netdev_default == NULL)
     {
-        rt_thread_mdelay(5000);
+        rt_thread_mdelay(2000);
         lssdp_error("Can't find default net device, please check the network driver.\r\n");
     }
 
