@@ -133,7 +133,7 @@ int lssdp_daemon(void) {
         }
 
         // doing task per 5 seconds
-        if (current_time - last_time >= 5000) {
+        if (current_time - last_time >= 2000) {
             lssdp_network_interface_update(&lssdp); // update network interface
             lssdp_service_send_notify(&lssdp);      // send notify messages to network
 
