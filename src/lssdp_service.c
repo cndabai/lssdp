@@ -129,10 +129,8 @@ int lssdp_service_del(struct lssdp_service *h)
     if (h == RT_NULL)
         return -RT_ERROR;
 
-    if(lssdp_service_unregister(h) == 0)
+    if(lssdp_service_unregister(h) != 0)
     {
-        return RT_EOK;
-    } else {
         LOG_E("lssdp_service_del service %s failed!", h->name);
         return -RT_ERROR;
     }
