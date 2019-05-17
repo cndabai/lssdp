@@ -157,13 +157,13 @@ int lssdp_service_send_notify(lssdp_ctx * lssdp)
     {
         LOG_D("name: %s ", ((struct lssdp_service *)head)->name);
 
-        if((rt_strcmp(lssdp->header.search_target, ((lssdp_service_t)head)->info.search_target) != 0))
+        if((rt_strcmp(lssdp->header.unique_service_name, ((lssdp_service_t)head)->info.unique_service_name) != 0))
         {
-            memcpy(lssdp->header.search_target,       ((lssdp_service_t)head)->info.search_target,       LSSDP_FIELD_LEN);
-            memcpy(lssdp->header.unique_service_name, ((lssdp_service_t)head)->info.unique_service_name, LSSDP_FIELD_LEN);
-            memcpy(lssdp->header.sm_id,               ((lssdp_service_t)head)->info.sm_id,               LSSDP_FIELD_LEN);
-            memcpy(lssdp->header.device_type,         ((lssdp_service_t)head)->info.device_type,         LSSDP_FIELD_LEN);
-            memcpy(lssdp->header.location.suffix,     ((lssdp_service_t)head)->info.suffix,              LSSDP_FIELD_LEN);
+            strcpy(lssdp->header.search_target,       ((lssdp_service_t)head)->info.search_target);
+            strcpy(lssdp->header.unique_service_name, ((lssdp_service_t)head)->info.unique_service_name);
+            strcpy(lssdp->header.sm_id,               ((lssdp_service_t)head)->info.sm_id);
+            strcpy(lssdp->header.device_type,         ((lssdp_service_t)head)->info.device_type);
+            strcpy(lssdp->header.location.suffix,     ((lssdp_service_t)head)->info.suffix);
         }
 
         lssdp_send_notify(lssdp);
