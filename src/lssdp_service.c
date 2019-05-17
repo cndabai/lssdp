@@ -134,6 +134,7 @@ int lssdp_service_del(struct lssdp_service *h)
         return RT_EOK;
     } else {
         LOG_E("lssdp_service_del service %s failed!", h->name);
+        return -RT_ERROR;
     }
 
     return RT_EOK;
