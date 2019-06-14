@@ -31,13 +31,13 @@ void log_callback(const char * file, const char * tag, int level, int line, cons
     if (level == LSSDP_LOG_WARN)   level_name = "WARN";
     if (level == LSSDP_LOG_ERROR)  level_name = "ERROR";
 
-    printf("[%-5s][%s] %s", level_name, tag, message);
+    rt_kprintf("[%-5s][%s] %s", level_name, tag, message);
 }
 
 long long get_current_time() {
     struct timeval time;
     if (gettimeofday(&time, NULL) == -1) {
-        printf("gettimeofday failed, errno = %s (%d)\n", strerror(errno), errno);
+        rt_kprintf("gettimeofday failed, errno = %s (%d)\n", strerror(errno), errno);
         return -1;
     }
     return (long long) time.tv_sec * 1000 + (long long) time.tv_usec / 1000;
@@ -46,9 +46,9 @@ long long get_current_time() {
 int show_neighbor_list(lssdp_ctx * lssdp) {
     int i = 0;
     lssdp_nbr * nbr;
-    printf("\nSSDP List:\n");
+    rt_kprintf("\nSSDP List:\n");
     for (nbr = lssdp->neighbor_list; nbr != NULL; nbr = nbr->next) {
-        printf("%d. id = %-9s, ip = %-20s, name = %-12s, device_type = %-8s (%lld)\n",
+        rt_kprintf("%d. id = %-9s, ip = %-20s, name = %-12s, device_type = %-8s (%lld)\n",
                ++i,
                nbr->sm_id,
                nbr->location,
@@ -57,26 +57,26 @@ int show_neighbor_list(lssdp_ctx * lssdp) {
                nbr->update_time
               );
     }
-    printf("%s\n", i == 0 ? "Empty" : "");
+    rt_kprintf("%s\n", i == 0 ? "Empty" : "");
     return 0;
 }
 
 int show_interface_list_and_rebind_socket(lssdp_ctx * lssdp) {
     // 1. show interface list
-    printf("\nNetwork Interface List (%u):\n", lssdp->interface_num);
+    rt_kprintf("\nNetwork Interface List (%u):\n", lssdp->interface_num);
     size_t i;
     for (i = 0; i < lssdp->interface_num; i++) {
-        printf("%u. %-6s: %s\n",
+        rt_kprintf("%u. %-6s: %s\n",
                i + 1,
                lssdp->interface[i].name,
                lssdp->interface[i].ip
               );
     }
-    printf("%s\n", i == 0 ? "Empty" : "");
+    rt_kprintf("%s\n", i == 0 ? "Empty" : "");
 
     // 2. re-bind SSDP socket
     if (lssdp_socket_create(lssdp) != 0) {
-        printf("SSDP create socket failed");
+        rt_kprintf("SSDP create socket failed");
         return -1;
     }
 
@@ -103,7 +103,7 @@ int lssdp_daemon(void) {
 
     long long last_time = get_current_time();
     if (last_time < 0) {
-        printf("got invalid timestamp %lld\n", last_time);
+        rt_kprintf("got invalid timestamp %lld\n", last_time);
         return EXIT_SUCCESS;
     }
 
@@ -117,7 +117,7 @@ int lssdp_daemon(void) {
 
         int ret = select(lssdp.sock + 1, &fs, NULL, NULL, &tv);
         if (ret < 0) {
-            printf("select error, ret = %d\n", ret);
+            rt_kprintf("select error, ret = %d\n", ret);
             break;
         }
 
@@ -128,7 +128,7 @@ int lssdp_daemon(void) {
         // get current time
         long long current_time = get_current_time();
         if (current_time < 0) {
-            printf("got invalid timestamp %lld\n", current_time);
+            rt_kprintf("got invalid timestamp %lld\n", current_time);
             break;
         }
 
