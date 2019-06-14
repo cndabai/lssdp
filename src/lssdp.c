@@ -19,9 +19,17 @@
 #define _SIZEOF_ADDR_IFREQ sizeof
 #endif
 
+//#define LOG_LEVEL_DEBUG
+
 /** Definition **/
 #define LSSDP_BUFFER_LEN    512
+
+#if defined(LOG_LEVEL_DEBUG)
 #define lssdp_debug(fmt, agrs...) lssdp_log(LSSDP_LOG_DEBUG, __LINE__, __func__, fmt, ##agrs)
+#else
+#define lssdp_debug(fmt, agrs...)  
+#endif
+
 #define lssdp_info(fmt, agrs...)  lssdp_log(LSSDP_LOG_INFO,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_warn(fmt, agrs...)  lssdp_log(LSSDP_LOG_WARN,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_error(fmt, agrs...) lssdp_log(LSSDP_LOG_ERROR, __LINE__, __func__, fmt, ##agrs)
@@ -105,13 +113,14 @@ int lssdp_network_interface_update(lssdp_ctx * lssdp) {
     // 2. reset lssdp->interface
     lssdp->interface_num = 0;
     memset(lssdp->interface, 0, SIZE_OF_INTERFACE_LIST);
-    
+
     // 3. get ifconfig
+    rt_thread_mdelay(5000);  // Wait for the default network initialization is successful
     extern struct netdev *netdev_default;
     while(netdev_default == NULL)
     {
-        rt_thread_mdelay(2000);
         lssdp_error("Can't find default net device, please check the network driver.\r\n");
+        rt_thread_mdelay(2000);
     }
 
     if(netdev_default != NULL)
