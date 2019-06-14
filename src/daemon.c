@@ -63,7 +63,7 @@ int show_neighbor_list(lssdp_ctx * lssdp) {
 
 int show_interface_list_and_rebind_socket(lssdp_ctx * lssdp) {
     // 1. show interface list
-    rt_kprintf("\nNetwork Interface List (%u):\n", lssdp->interface_num);
+    rt_kprintf("\n LSSDP network interface list (%u):\n", lssdp->interface_num);
     size_t i;
     for (i = 0; i < lssdp->interface_num; i++) {
         rt_kprintf("%u. %-6s: %s\n",

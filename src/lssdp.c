@@ -13,6 +13,7 @@
 #include <netinet/in.h> // struct sockaddr_in, struct ip_mreq, INADDR_ANY, IPPROTO_IP, also include <sys/socket.h>
 #include <arpa/inet.h>  // inet_aton, inet_ntop, inet_addr, also include <netinet/in.h>
 #include <netdev.h>
+#include <rtthread.h>
 #include "lssdp.h"
 
 #ifndef _SIZEOF_ADDR_IFREQ
