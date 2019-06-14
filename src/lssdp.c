@@ -19,20 +19,20 @@
 #define _SIZEOF_ADDR_IFREQ sizeof
 #endif
 
-//#define LOG_LEVEL_DEBUG
-
 /** Definition **/
 #define LSSDP_BUFFER_LEN    512
 
-#if defined(LOG_LEVEL_DEBUG)
+#if defined(LSSDP_ENABLE_DEBUG_MESSAGES)
 #define lssdp_debug(fmt, agrs...) lssdp_log(LSSDP_LOG_DEBUG, __LINE__, __func__, fmt, ##agrs)
-#else
-#define lssdp_debug(fmt, agrs...)  
-#endif
-
 #define lssdp_info(fmt, agrs...)  lssdp_log(LSSDP_LOG_INFO,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_warn(fmt, agrs...)  lssdp_log(LSSDP_LOG_WARN,  __LINE__, __func__, fmt, ##agrs)
 #define lssdp_error(fmt, agrs...) lssdp_log(LSSDP_LOG_ERROR, __LINE__, __func__, fmt, ##agrs)
+#else
+#define lssdp_debug(fmt, agrs...)
+#define lssdp_info(fmt, agrs...)
+#define lssdp_warn(fmt, agrs...)
+#define lssdp_error(fmt, agrs...)
+#endif
 
 /** Struct: lssdp_packet **/
 typedef struct lssdp_packet {
@@ -740,7 +740,6 @@ static int parse_field_line(const char * data, size_t start, size_t end, lssdp_p
         return -1;
     }
 
-
     // 2. get field, field_len
     size_t i = start;
     size_t j = colon - 1;
@@ -749,7 +748,6 @@ static int parse_field_line(const char * data, size_t start, size_t end, lssdp_p
     }
     const char * field = &data[i];
     size_t field_len = j - i + 1;
-
 
     // 3. get value, value_len
     i = colon + 1;
