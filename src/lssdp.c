@@ -6,7 +6,7 @@
 #include <errno.h>      // errno
 #include <unistd.h>     // close
 #include <sys/time.h>   // gettimeofday
-#include <dfs_posix.h>  // ioctl, FIONBIO
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <fcntl.h>      // fcntl, F_GETFD, F_SETFD, FD_CLOEXEC
 #include <sys/socket.h> // struct sockaddr, AF_INET, SOL_SOCKET, socklen_t, setsockopt, socket, bind, sendto, recvfrom
